@@ -84,6 +84,7 @@ def main():
     # list them
     for port, desc, hwid in iterator:
         print("%-20s" % (port,))
+        #print(port, desc, hwid)
         if options.verbose > 1:
             print("    desc: %s" % (desc,))
             print("    hwid: %s" % (hwid,))
