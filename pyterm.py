@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import os, sys
-from serial import Serial
+#from serial import Serial
+import serial
 from PySide import QtGui, QtCore
 from PySide.QtCore import *
 from PySide.QtGui import *
@@ -18,15 +19,19 @@ def main(args):
 	a = QtGui.QApplication(args)
 	
 	
-	s = Serial('/dev/cu.usbserial-A6008cB6')
+	try:
+		s = serial.Serial('/dev/cu.usbserial-A6008cB6')
+		
+		#print("Open: ", s.open())
+		
+		print("Bytes: ", s.write(bytes('test', 'UTF-8')))
+		
+		print("Read: ", s.read(4))
 	
-	#print("Open: ", s.open())
-	
-	print("Bytes: ", s.write(bytes('test', 'UTF-8')))
-	
-	print("Read: ", s.read(4))
-	
-	s.close()
+		s.close()
+		
+	except (FileNotFoundError, serial.SerialException):
+		print("Error")
 	
 	matchedPorts = PortsListener.getPorts()
 	
