@@ -32,11 +32,6 @@ class SerialEvents(QObject, threading.Thread):
 		
 		self._availableBytes = 0
 	
-	def __del__(self):
-		self.stop()
-		threading.Thread.__del__(self)
-		QObject.__del__(self)
-	
 	
 	""" Read all waiting bytes.
 	Function provided for convenience
@@ -55,7 +50,7 @@ class SerialEvents(QObject, threading.Thread):
 	def run(self):
 		
 		if verbose:
-			print("Entering Serial events loop...")
+			print('Entering Serial events loop...')
 			
 		while not self._stopEvent.isSet():
 			# Check if data in buffer
@@ -65,20 +60,22 @@ class SerialEvents(QObject, threading.Thread):
 				if wb > 0 and wb != self._availableBytes:	# Emit readyRead signal only one time
 					#string = self._serialObject.read(self._serialObject.inWaiting())
 					
-					# Store current number of waiting bytes
-					self._availableBytes = self._serialObject.inWaiting()
-					
 					# Emit signal with number of bytes to read
 					self.readyRead.emit(self._serialObject.inWaiting())
 					
 					if verbose:
-						print("Data available (%1)", self._serialObject.inWaiting())
+						print('Data available (', self._serialObject.inWaiting(), ')')
+				
+				# Store current number of waiting bytes
+				self._availableBytes = self._serialObject.inWaiting()
+				
 				time.sleep(0.1) # Wait 100ms
-			
-			time.sleep(1)	# Wait 1s
+				
+			else:	# Not open, wait more
+				time.sleep(1)	# Wait 1s
 		
 		if verbose:
-			print("SerialEvents thread exited")
+			print('SerialEvents thread exited')
 		
 
 
@@ -95,9 +92,13 @@ def main(args):
 		if not s.isOpen():
 			s.port = ports_cb.currentText()
 			s.open()
+			connect.setText('Connected')
 	
 	def sendStr():
 		s.write(bytes('ABCDEF', 'UTF-8'))
+		
+	def write():
+		textedit.setText(textedit.toPlainText() + se.readAll().decode("utf-8"))
 	
 	
 	a = QtGui.QApplication(args)
@@ -116,9 +117,12 @@ def main(args):
 	send = QPushButton("Send")
 	send.clicked.connect(sendStr)
 	
+	textedit = QTextEdit()
+	
 	s = serial.Serial()
 	
 	se = SerialEvents(s)
+	se.readyRead.connect(write)
 	se.start()
 	
 	# try:
@@ -150,12 +154,14 @@ def main(args):
 	layout.addWidget(ports_cb)
 	layout.addWidget(connect)
 	layout.addWidget(send)
+	layout.addWidget(textedit)
 	
 	window.setLayout(layout)
 	window.show()
 	
 	
 	r = a.exec_()
+	quit()
 	return r
 
 
