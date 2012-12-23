@@ -10,6 +10,7 @@ from PySide.QtGui import *
 from portsListener import PortsListener
 import threading
 import time
+import re
 
 verbose = 1
 
@@ -78,6 +79,69 @@ class SerialEvents(QObject, threading.Thread):
 			print('SerialEvents thread exited')
 		
 
+class LoadException(Exception):
+    def __init__(self,reason):
+        self.reason = reason
+    
+    def __str__(self):
+        return self.reason
+
+import modules
+class PluginManager():
+	
+	_pluginNameRe = '^[a-z].+\.py$'	# Plugin must begin with letter
+	
+	def __init__(self):
+		self.plugins = dict()
+		self._pluginsNames = []
+		self.currentPlugin = None
+		
+		self.loadPlugins()
+	
+	def loadPlugins(self):
+		files = os.listdir('modules')
+		
+		test = re.compile(self._pluginNameRe, re.IGNORECASE)
+		
+		self._pluginsNames = [item for item in files if (test.search(item) and item not in modules.__ignore__)]
+		
+		if len(self._pluginsNames) == 0:
+			raise LoadException('No plugins loaded!')
+		
+		for _pluginName in self._pluginsNames:
+			pluginName = _pluginName[0:-3]
+			plugin = __import__ ("modules." + pluginName, fromlist=self._pluginsNames) # Load plugin
+			
+			plugin_instance = getattr(plugin, pluginName)() # Call constructor
+			
+			# Check if plugin have right methods (= usable plugin)
+			if hasattr(plugin_instance, 'processText'):
+				self.plugins[pluginName] = plugin_instance
+			else:
+				raise RuntimeWarning('Unusable plugin: ', pluginName)
+			
+		
+		if 'default' not in self.plugins:
+			raise LoadException('Default plugin not found!')
+		else:
+			self.currentPlugin = 'default'
+	
+	def usePlugin(self, pluginName):
+		if pluginName in self.plugins.keys():
+			self.currentPlugin = pluginName
+			return True
+		else:
+			raise RuntimeWarning('Unable to load plugin ', pluginName, ', back to default plugin.')
+		return False
+		
+	def process(self, alltext, text):
+		if self.currentPlugin:
+			return self.plugins[self.currentPlugin].processText(alltext, text)
+		
+		raise RuntimeWarning('No plugin set ! Return default')
+		return alltext + text
+		
+
 
 def main(args):
 	
@@ -98,7 +162,9 @@ def main(args):
 		s.write(bytes('ABCDEF', 'UTF-8'))
 		
 	def write():
-		textedit.setText(textedit.toPlainText() + se.readAll().decode("utf-8"))
+		processedText = pm.process(textedit.toPlainText(), se.readAll().decode("utf-8"))
+		
+		textedit.setText(processedText)
 	
 	
 	a = QtGui.QApplication(args)
@@ -119,6 +185,13 @@ def main(args):
 	
 	textedit = QTextEdit()
 	
+	
+	pm = PluginManager()
+	
+	plugins_cb = QComboBox()
+	plugins_cb.addItems(list(pm.plugins.keys()))
+	
+	
 	s = serial.Serial()
 	
 	se = SerialEvents(s)
@@ -127,23 +200,6 @@ def main(args):
 	
 	# try:
 	# 	s = serial.Serial('/dev/cu.usbserial-A6008cB6')
-		
-		
-		
-	# 	#print("Open: ", s.open())
-		
-	# 	print("Bytes: ", s.write(bytes('test', 'UTF-8')))
-	# 	print("Bytes: ", s.write(bytes('erfhurfgjrfgjhrgf', 'UTF-8')))
-		
-	# 	time.sleep(1)
-		
-	# 	#print("Read: ", s.read(4))
-	
-	# 	se.stop()
-		
-	# 	#se.join()
-	# 	s.close()
-		
 	# except (FileNotFoundError, serial.SerialException):
 	# 	print("Error")
 	
@@ -155,6 +211,7 @@ def main(args):
 	layout.addWidget(connect)
 	layout.addWidget(send)
 	layout.addWidget(textedit)
+	layout.addWidget(plugins_cb)
 	
 	window.setLayout(layout)
 	window.show()

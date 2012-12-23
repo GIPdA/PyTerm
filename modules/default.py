@@ -2,10 +2,11 @@
 
 class default:
 	
-	type = 'text'
+	description = 'Default plugin'
 	
 	def __init__(self):
 		pass
 
-	def processText(self, text):
-		print(text)
+	def processText(self, alltext, text):
+		#print(alltext, text)
+		return alltext + text
